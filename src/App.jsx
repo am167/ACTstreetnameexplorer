@@ -6,6 +6,8 @@ import SearchControls from "./components/SearchControls";
 
 const SEARCH_DEBOUNCE_MS = 320;
 const SEARCH_LIMIT = 80;
+const INITIAL_VISIBLE_COUNT = 5;
+const VISIBLE_STEP = 5;
 
 const client = new ActPlaceNamesClient();
 
@@ -33,6 +35,7 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   const [features, setFeatures] = useState([]);
   const [exceededTransferLimit, setExceededTransferLimit] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [status, setStatus] = useState({ message: "", tone: "neutral" });
   const [ready, setReady] = useState(false);
   const requestIdRef = useRef(0);
@@ -107,6 +110,7 @@ export default function App() {
         }
 
         setFeatures(result.features);
+        setVisibleCount(INITIAL_VISIBLE_COUNT);
         setExceededTransferLimit(result.exceededTransferLimit);
 
         const querySummary = query ? ` for \"${query}\"` : "";
@@ -145,10 +149,24 @@ export default function App() {
     setQueryInput("");
     setQuery("");
     setCategory("");
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
     setSearchSeed((seed) => seed + 1);
   }
 
+  function handleShowMore() {
+    setVisibleCount((current) => Math.min(current + VISIBLE_STEP, features.length));
+  }
+
+  function handleShowAll() {
+    setVisibleCount(features.length);
+  }
+
   const resultCount = useMemo(() => features.length, [features]);
+  const visibleFeatures = useMemo(
+    () => features.slice(0, Math.min(visibleCount, features.length)),
+    [features, visibleCount]
+  );
+  const hiddenCount = Math.max(features.length - visibleFeatures.length, 0);
 
   return (
     <div className="page-shell">
@@ -181,16 +199,29 @@ export default function App() {
             <h2>Matching Entries</h2>
             <span className="count-badge">{resultCount}</span>
           </div>
+          <p className="results-summary">
+            Showing {visibleFeatures.length} of {resultCount}
+          </p>
           <div className="results">
-            <ResultsPanel features={features} exceededTransferLimit={exceededTransferLimit} />
+            <ResultsPanel features={visibleFeatures} exceededTransferLimit={exceededTransferLimit} />
           </div>
+          {hiddenCount > 0 && (
+            <div className="results-actions">
+              <button type="button" onClick={handleShowMore}>
+                Show {Math.min(VISIBLE_STEP, hiddenCount)} More
+              </button>
+              <button type="button" className="ghost" onClick={handleShowAll}>
+                Show All ({resultCount})
+              </button>
+            </div>
+          )}
         </section>
 
         <aside className="panel map-panel">
           <div className="panel-head">
             <h2>Map View</h2>
           </div>
-          <MapPanel features={features} />
+          <MapPanel features={visibleFeatures} />
         </aside>
       </main>
 
