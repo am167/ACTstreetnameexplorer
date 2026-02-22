@@ -230,6 +230,14 @@ export default function App() {
         <a href={DEFAULT_LAYER_URL} target="_blank" rel="noreferrer noopener">
           Open source layer
         </a>
+        {" | "}
+        <a
+          href="https://github.com/am167/ACTstreetnameexplorer"
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          GitHub
+        </a>
       </footer>
     </div>
   );
