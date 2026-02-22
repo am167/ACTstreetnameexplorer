@@ -1,4 +1,4 @@
-const DEFAULT_LAYER_URL =
+export const DEFAULT_LAYER_URL =
   "https://services1.arcgis.com/E5n4f1VY84i0xSjy/ArcGIS/rest/services/ACTGOV_PLACENAMES/FeatureServer/0";
 
 const DEFAULT_OUT_FIELDS = [
@@ -17,6 +17,63 @@ function escapeSqlLiteral(value) {
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function compareByNameThenId(a, b) {
+  const aAttrs = a?.attributes || {};
+  const bAttrs = b?.attributes || {};
+
+  const nameCompare = String(aAttrs.NAME || "").localeCompare(String(bAttrs.NAME || ""));
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+
+  return Number(aAttrs.OBJECTID || 0) - Number(bAttrs.OBJECTID || 0);
+}
+
+function scoreFeatureRelevance(feature, normalizedQuery) {
+  if (!normalizedQuery) {
+    return 0;
+  }
+
+  const attrs = feature?.attributes || {};
+  const name = normalizeText(attrs.NAME);
+  const otherName = normalizeText(attrs.OTHER_NAME);
+  const description = normalizeText(attrs.DESCRIPTION);
+
+  let score = 0;
+
+  if (name === normalizedQuery) {
+    score += 1000;
+  } else if (name.startsWith(normalizedQuery)) {
+    score += 800;
+  } else if (name.includes(normalizedQuery)) {
+    score += 600;
+  }
+
+  if (otherName === normalizedQuery) {
+    score += 550;
+  } else if (otherName.startsWith(normalizedQuery)) {
+    score += 350;
+  } else if (otherName.includes(normalizedQuery)) {
+    score += 250;
+  }
+
+  if (description.includes(`commemorated name: ${normalizedQuery}`)) {
+    score += 300;
+  }
+  if (description.includes(`feature name: ${normalizedQuery}`)) {
+    score += 250;
+  }
+  if (description.includes(normalizedQuery)) {
+    score += 100;
+  }
+
+  return score;
 }
 
 export class ActPlaceNamesClient {
@@ -42,7 +99,7 @@ export class ActPlaceNamesClient {
   }
 
   async getCategories() {
-    const query = {
+    const params = {
       where: "CATEGORY_NAME IS NOT NULL",
       outFields: "CATEGORY_NAME",
       orderByFields: "CATEGORY_NAME ASC",
@@ -51,11 +108,11 @@ export class ActPlaceNamesClient {
       f: "json",
     };
 
-    const result = await this.queryRaw(query);
+    const result = await this.queryRaw(params);
     const values = (result.features || [])
       .map((feature) => feature?.attributes?.CATEGORY_NAME)
-      .filter((name) => typeof name === "string" && name.trim() !== "")
-      .map((name) => name.trim());
+      .filter((value) => typeof value === "string" && value.trim().length > 0)
+      .map((value) => value.trim());
 
     return [...new Set(values)];
   }
@@ -63,7 +120,7 @@ export class ActPlaceNamesClient {
   async searchPlaces({
     query = "",
     category = "",
-    limit = 60,
+    limit = 80,
     offset = 0,
     includeGeometry = true,
   } = {}) {
@@ -85,23 +142,56 @@ export class ActPlaceNamesClient {
       whereParts.push(`CATEGORY_NAME = '${safeCategory}'`);
     }
 
-    const queryParams = {
+    const params = {
       where: whereParts.join(" AND "),
       outFields: DEFAULT_OUT_FIELDS.join(","),
       orderByFields: "NAME ASC, OBJECTID ASC",
-      resultRecordCount: String(limit),
+      // Fetch a wider set when searching so client-side relevance ranking
+      // can place strong matches ahead of incidental description matches.
+      resultRecordCount: String(isNonEmptyString(query) ? Math.max(limit * 4, 200) : limit),
       resultOffset: String(offset),
       returnGeometry: includeGeometry ? "true" : "false",
       outSR: includeGeometry ? "4326" : undefined,
       f: "json",
     };
 
-    const result = await this.queryRaw(queryParams);
+    const result = await this.queryRaw(params);
+    const normalizedQuery = normalizeText(query);
+
+    let features = result.features || [];
+
+    if (normalizedQuery) {
+      features = features
+        .map((feature, index) => ({
+          feature,
+          index,
+          score: scoreFeatureRelevance(feature, normalizedQuery),
+        }))
+        .sort((a, b) => {
+          if (b.score !== a.score) {
+            return b.score - a.score;
+          }
+
+          const nameSort = compareByNameThenId(a.feature, b.feature);
+          if (nameSort !== 0) {
+            return nameSort;
+          }
+
+          return a.index - b.index;
+        })
+        .map((item) => item.feature);
+    } else {
+      features = [...features].sort(compareByNameThenId);
+    }
+
+    if (features.length > limit) {
+      features = features.slice(0, limit);
+    }
 
     return {
-      features: result.features || [],
+      features,
+      count: features.length,
       exceededTransferLimit: Boolean(result.exceededTransferLimit),
-      count: (result.features || []).length,
     };
   }
 
@@ -130,5 +220,3 @@ export class ActPlaceNamesClient {
     return data;
   }
 }
-
-export { DEFAULT_LAYER_URL };

@@ -1,6 +1,6 @@
-# ACT Street Name Origins Explorer
+# ACT Street Name Origins Explorer (React + Vite)
 
-A lightweight frontend wrapper over the ACT place-names geospatial dataset. It lets you search ACT streets/place names and quickly see who or what each feature is named after.
+A React frontend wrapper over the ACT place-names geospatial dataset. Search ACT streets/place names and see who or what each feature is named after.
 
 ## Data Source
 
@@ -11,29 +11,33 @@ A lightweight frontend wrapper over the ACT place-names geospatial dataset. It l
 ## Features
 
 - Search by street name, commemorated name, or description text
-- Filter by category
-- Clear card layout for commemorative details and biography snippets
-- Map markers for matching results
-- Responsive UI for desktop/mobile
+- Category filtering
+- Structured card view for naming/origin details
+- Leaflet map markers for matching entries
+- Responsive desktop/mobile UI
 
-## Run Locally
-
-Use any static file server from the project root. For example:
+## Run
 
 ```bash
-python3 -m http.server 8000
+npm install
+npm run dev
 ```
 
-Then open:
+Open the local URL shown by Vite (usually `http://localhost:5173`).
 
-```text
-http://localhost:8000
+## Build
+
+```bash
+npm run build
+npm run preview
 ```
 
-## File Structure
+## Project Structure
 
-- `index.html`: UI shell
-- `styles.css`: visual design and responsiveness
-- `js/actPlaceNamesClient.js`: ArcGIS wrapper client
-- `js/formatters.js`: description parsing and display formatting
-- `js/app.js`: search flow, rendering, and map integration
+- `src/App.jsx`: app state, search flow, composition
+- `src/api/actPlaceNamesClient.js`: ArcGIS query wrapper
+- `src/utils/formatters.js`: description parsing and formatting
+- `src/components/SearchControls.jsx`: search + filters
+- `src/components/ResultsPanel.jsx`: results cards and empty states
+- `src/components/MapPanel.jsx`: Leaflet map rendering
+- `src/styles.css`: styling and responsiveness

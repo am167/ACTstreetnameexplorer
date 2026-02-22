@@ -12,7 +12,7 @@ export function escapeHtml(value) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
 
@@ -34,7 +34,6 @@ export function parseDescription(description) {
     const key = cleanValue(line.slice(0, separator)).toLowerCase();
     const value = cleanValue(line.slice(separator + 1));
 
-    // Structured records use short label keys like "Feature Name" and "Biography".
     if (key.length > 1 && key.length < 40 && value) {
       fields[key] = value;
     }
@@ -72,16 +71,20 @@ export function formatBiographyPreview(text, maxLength = 340) {
   return `${cleaned.slice(0, maxLength).trim()}...`;
 }
 
+export function getLabelValue(parsed, label) {
+  return parsed.labelledValues.find((item) => item.label === label)?.value || "";
+}
+
 export function buildNamedAfterLabel({
   commemoratedName,
   givenNames,
   title,
   fallbackName = "",
 }) {
-  const pieces = [title, givenNames, commemoratedName]
+  const fullName = [title, givenNames, commemoratedName]
     .map((piece) => cleanValue(piece))
     .filter(Boolean)
     .join(" ");
 
-  return pieces || cleanValue(fallbackName) || "Not specified";
+  return fullName || cleanValue(fallbackName) || "Not specified";
 }
