@@ -1,4 +1,4 @@
-# ACT Street Name Origins Explorer (React + Vite)
+# ACT Street Name Origins Explorer
 
 A React frontend wrapper over the ACT place-names geospatial dataset. Search ACT streets/place names and see who or what each feature is named after.
 
