@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActPlaceNamesClient, DEFAULT_LAYER_URL } from "./api/actPlaceNamesClient";
+import FeatureModal from "./components/FeatureModal";
 import MapPanel from "./components/MapPanel";
 import ResultsPanel from "./components/ResultsPanel";
 import SearchControls from "./components/SearchControls";
@@ -28,6 +29,17 @@ function useDebouncedValue(value, delay) {
 }
 
 export default function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved) return saved === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", darkMode ? "dark" : "light");
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [searchSeed, setSearchSeed] = useState(0);
@@ -37,6 +49,7 @@ export default function App() {
   const [exceededTransferLimit, setExceededTransferLimit] = useState(false);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [status, setStatus] = useState({ message: "", tone: "neutral" });
+  const [selectedFeature, setSelectedFeature] = useState(null);
   const [ready, setReady] = useState(false);
   const requestIdRef = useRef(0);
 
@@ -171,6 +184,17 @@ export default function App() {
   return (
     <div className="page-shell">
       <header className="hero">
+        <button
+          className={`theme-toggle${darkMode ? " theme-toggle--dark" : ""}`}
+          onClick={() => setDarkMode((d) => !d)}
+          aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          <span aria-hidden="true">☀</span>
+          <span className="theme-toggle__track">
+            <span className="theme-toggle__thumb" />
+          </span>
+          <span aria-hidden="true">☽</span>
+        </button>
         <p className="eyebrow">ACT Place Names</p>
         <h1>Street Name Origins Explorer</h1>
         <p className="intro">
@@ -203,7 +227,7 @@ export default function App() {
             Showing {visibleFeatures.length} of {resultCount}
           </p>
           <div className="results">
-            <ResultsPanel features={visibleFeatures} exceededTransferLimit={exceededTransferLimit} />
+            <ResultsPanel features={visibleFeatures} exceededTransferLimit={exceededTransferLimit} onLearnMore={setSelectedFeature} />
           </div>
           {hiddenCount > 0 && (
             <div className="results-actions">
@@ -224,6 +248,10 @@ export default function App() {
           <MapPanel features={visibleFeatures} />
         </aside>
       </main>
+
+      {selectedFeature && (
+        <FeatureModal feature={selectedFeature} onClose={() => setSelectedFeature(null)} />
+      )}
 
       <footer className="footer">
         Data sourced from ACT Government via ACTMapi / ArcGIS Online, licensed under CC BY 4.0. {" "}

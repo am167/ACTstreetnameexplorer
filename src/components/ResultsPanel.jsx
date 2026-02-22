@@ -5,7 +5,7 @@ import {
   parseDescription,
 } from "../utils/formatters";
 
-function ResultCard({ feature, index }) {
+function ResultCard({ feature, index, onLearnMore }) {
   const attrs = feature?.attributes || {};
   const parsed = parseDescription(attrs.DESCRIPTION || "");
 
@@ -42,11 +42,14 @@ function ResultCard({ feature, index }) {
       )}
 
       <p className="bio-preview">{formatBiographyPreview(parsed.biography)}</p>
+      <button type="button" className="learn-more-btn" onClick={() => onLearnMore(feature)}>
+        Learn more
+      </button>
     </article>
   );
 }
 
-export default function ResultsPanel({ features, exceededTransferLimit }) {
+export default function ResultsPanel({ features, exceededTransferLimit, onLearnMore }) {
   if (features.length === 0) {
     return (
       <article className="empty-state">
@@ -63,6 +66,7 @@ export default function ResultsPanel({ features, exceededTransferLimit }) {
           key={feature?.attributes?.OBJECTID || `${feature?.attributes?.NAME || "entry"}-${index}`}
           feature={feature}
           index={index}
+          onLearnMore={onLearnMore}
         />
       ))}
 
