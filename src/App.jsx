@@ -1,32 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ActPlaceNamesClient, DEFAULT_LAYER_URL } from "./api/actPlaceNamesClient";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActPlaceNamesClient,
+  DEFAULT_LAYER_URL,
+  compareByNameThenId,
+  normalizeText,
+  scoreFeatureRelevance,
+} from "./api/actPlaceNamesClient";
 import FeatureModal from "./components/FeatureModal";
 import MapPanel from "./components/MapPanel";
 import ResultsPanel from "./components/ResultsPanel";
 import SearchControls from "./components/SearchControls";
 
-const SEARCH_DEBOUNCE_MS = 320;
 const SEARCH_LIMIT = 80;
 const INITIAL_VISIBLE_COUNT = 5;
 const VISIBLE_STEP = 5;
 
 const client = new ActPlaceNamesClient();
-
-function useDebouncedValue(value, delay) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(() => {
@@ -41,129 +30,115 @@ export default function App() {
   }, [darkMode]);
 
   const [queryInput, setQueryInput] = useState("");
-  const [query, setQuery] = useState("");
-  const [searchSeed, setSearchSeed] = useState(0);
   const [category, setCategory] = useState("");
-  const [categories, setCategories] = useState([]);
-  const [features, setFeatures] = useState([]);
-  const [exceededTransferLimit, setExceededTransferLimit] = useState(false);
+  const [allFeatures, setAllFeatures] = useState(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [status, setStatus] = useState({ message: "", tone: "neutral" });
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [ready, setReady] = useState(false);
-  const requestIdRef = useRef(0);
-
-  const debouncedInput = useDebouncedValue(queryInput.trim(), SEARCH_DEBOUNCE_MS);
 
   useEffect(() => {
-    setQuery(debouncedInput);
-  }, [debouncedInput]);
-
-  useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function bootstrap() {
-      setStatus({ message: "Loading ACT place-name metadata...", tone: "loading" });
+      setStatus({ message: "Loading ACT place names...", tone: "loading" });
 
       try {
         const info = await client.getLayerInfo();
-        if (!cancelled) {
-          setStatus({ message: `Loaded ${info?.name || "ACT place names"}.`, tone: "success" });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStatus({ message: `Metadata load failed: ${error.message}`, tone: "warn" });
-        }
+        setStatus({ message: `Loading ${info?.name || "ACT place names"}...`, tone: "loading" });
+      } catch {
+        // non-fatal — keep loading
       }
 
       try {
-        const list = await client.getCategories();
-        if (!cancelled) {
-          setCategories(list);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setStatus({ message: `Category filter unavailable: ${error.message}`, tone: "warn" });
-        }
-      }
-
-      if (!cancelled) {
+        const features = await client.fetchAllFeatures({
+          signal: controller.signal,
+          onProgress: (n) =>
+            setStatus({ message: `Loading ACT place names... (${n} loaded)`, tone: "loading" }),
+        });
+        setAllFeatures(features);
+        setStatus({ message: `Loaded ${features.length} place names.`, tone: "success" });
         setReady(true);
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        setStatus({ message: `Failed to load data: ${err.message}`, tone: "error" });
       }
     }
 
     bootstrap();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, []);
 
-  useEffect(() => {
-    if (!ready) {
-      return;
-    }
-
-    let cancelled = false;
-    const requestId = ++requestIdRef.current;
-
-    async function runSearch() {
-      setStatus({ message: "Searching ACT place names...", tone: "loading" });
-
-      try {
-        const result = await client.searchPlaces({
-          query,
-          category,
-          limit: SEARCH_LIMIT,
-          includeGeometry: true,
-        });
-
-        if (cancelled || requestId !== requestIdRef.current) {
-          return;
-        }
-
-        setFeatures(result.features);
-        setVisibleCount(INITIAL_VISIBLE_COUNT);
-        setExceededTransferLimit(result.exceededTransferLimit);
-
-        const querySummary = query ? ` for \"${query}\"` : "";
-        const categorySummary = category ? ` in ${category}` : "";
-        setStatus({
-          message: `Showing ${result.features.length} result${
-            result.features.length === 1 ? "" : "s"
-          }${querySummary}${categorySummary}.`,
-          tone: "success",
-        });
-      } catch (error) {
-        if (cancelled || requestId !== requestIdRef.current) {
-          return;
-        }
-
-        setFeatures([]);
-        setExceededTransferLimit(false);
-        setStatus({ message: `Search failed: ${error.message}`, tone: "error" });
+  const categories = useMemo(() => {
+    if (!allFeatures) return [];
+    const seen = new Set();
+    const result = [];
+    for (const f of allFeatures) {
+      const c = f.attributes?.CATEGORY_NAME;
+      if (c && !seen.has(c)) {
+        seen.add(c);
+        result.push(c);
       }
     }
+    return result.sort();
+  }, [allFeatures]);
 
-    runSearch();
+  const features = useMemo(() => {
+    if (!allFeatures) return [];
 
-    return () => {
-      cancelled = true;
-    };
-  }, [query, category, ready, searchSeed]);
+    const trimmed = queryInput.trim();
+    const normalizedQuery = normalizeText(trimmed);
 
-  function handleSubmit(event) {
-    event.preventDefault();
-    setQuery(queryInput.trim());
-    setSearchSeed((seed) => seed + 1);
+    let results = allFeatures;
+
+    if (category) {
+      results = results.filter((f) => f.attributes?.CATEGORY_NAME === category);
+    }
+
+    if (normalizedQuery) {
+      results = results.filter((f) => {
+        const a = f.attributes || {};
+        return (
+          normalizeText(a.NAME).includes(normalizedQuery) ||
+          normalizeText(a.OTHER_NAME || "").includes(normalizedQuery) ||
+          normalizeText(a.DESCRIPTION || "").includes(normalizedQuery)
+        );
+      });
+      results = results
+        .map((f, i) => ({ f, i, score: scoreFeatureRelevance(f, normalizedQuery) }))
+        .sort(
+          (a, b) =>
+            b.score - a.score || compareByNameThenId(a.f, b.f) || a.i - b.i
+        )
+        .map(({ f }) => f);
+    } else {
+      results = [...results].sort(compareByNameThenId);
+    }
+
+    return results.slice(0, SEARCH_LIMIT);
+  }, [allFeatures, queryInput, category]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const querySummary = queryInput.trim() ? ` for "${queryInput.trim()}"` : "";
+    const categorySummary = category ? ` in ${category}` : "";
+    setStatus({
+      message: `Showing ${features.length} result${features.length === 1 ? "" : "s"}${querySummary}${categorySummary}.`,
+      tone: "success",
+    });
+  }, [features, queryInput, category, ready]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [queryInput, category]);
+
+  function handleSubmit(e) {
+    e.preventDefault();
   }
 
   function handleClear() {
     setQueryInput("");
-    setQuery("");
     setCategory("");
-    setVisibleCount(INITIAL_VISIBLE_COUNT);
-    setSearchSeed((seed) => seed + 1);
   }
 
   function handleShowMore() {
@@ -174,7 +149,7 @@ export default function App() {
     setVisibleCount(features.length);
   }
 
-  const resultCount = useMemo(() => features.length, [features]);
+  const resultCount = features.length;
   const visibleFeatures = useMemo(
     () => features.slice(0, Math.min(visibleCount, features.length)),
     [features, visibleCount]
@@ -227,7 +202,7 @@ export default function App() {
             Showing {visibleFeatures.length} of {resultCount}
           </p>
           <div className="results">
-            <ResultsPanel features={visibleFeatures} exceededTransferLimit={exceededTransferLimit} onLearnMore={setSelectedFeature} />
+            <ResultsPanel features={visibleFeatures} exceededTransferLimit={false} onLearnMore={setSelectedFeature} />
           </div>
           {hiddenCount > 0 && (
             <div className="results-actions">

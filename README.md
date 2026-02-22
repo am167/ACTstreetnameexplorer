@@ -23,8 +23,6 @@ npm install
 npm run dev
 ```
 
-Open the local URL shown by Vite (usually `http://localhost:5173`).
-
 ## Build
 
 ```bash

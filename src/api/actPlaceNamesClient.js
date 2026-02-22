@@ -19,11 +19,11 @@ function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function normalizeText(value) {
+export function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-function compareByNameThenId(a, b) {
+export function compareByNameThenId(a, b) {
   const aAttrs = a?.attributes || {};
   const bAttrs = b?.attributes || {};
 
@@ -35,7 +35,7 @@ function compareByNameThenId(a, b) {
   return Number(aAttrs.OBJECTID || 0) - Number(bAttrs.OBJECTID || 0);
 }
 
-function scoreFeatureRelevance(feature, normalizedQuery) {
+export function scoreFeatureRelevance(feature, normalizedQuery) {
   if (!normalizedQuery) {
     return 0;
   }
@@ -195,7 +195,34 @@ export class ActPlaceNamesClient {
     };
   }
 
-  async queryRaw(params = {}) {
+  async fetchAllFeatures({ signal, onProgress } = {}) {
+    const PAGE_SIZE = 1000;
+    let offset = 0;
+    const all = [];
+
+    while (true) {
+      const result = await this.queryRaw({
+        where: "1=1",
+        outFields: DEFAULT_OUT_FIELDS.join(","),
+        orderByFields: "NAME ASC, OBJECTID ASC",
+        resultRecordCount: String(PAGE_SIZE),
+        resultOffset: String(offset),
+        returnGeometry: "true",
+        outSR: "4326",
+        f: "json",
+      }, signal);
+
+      all.push(...(result.features || []));
+      onProgress?.(all.length);
+
+      if (!result.exceededTransferLimit) break;
+      offset += PAGE_SIZE;
+    }
+
+    return all;
+  }
+
+  async queryRaw(params = {}, signal) {
     const url = new URL(`${this.layerUrl}/query`);
 
     Object.entries(params).forEach(([key, value]) => {
@@ -204,7 +231,7 @@ export class ActPlaceNamesClient {
       }
     });
 
-    const response = await fetch(url);
+    const response = await fetch(url, signal ? { signal } : undefined);
     if (!response.ok) {
       throw new Error(`Query failed (${response.status})`);
     }
