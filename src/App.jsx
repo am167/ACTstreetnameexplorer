@@ -187,9 +187,18 @@ export default function App() {
           categories={categories}
         />
 
-        <p className="status" data-tone={status.tone} role="status" aria-live="polite">
-          {status.message}
-        </p>
+        {status.tone === "loading" ? (
+          <div className="loading-status" role="status" aria-live="polite">
+            <div className="loading-bar" aria-hidden="true">
+              <div className="loading-bar__fill" />
+            </div>
+            <p className="loading-label">{status.message}</p>
+          </div>
+        ) : (
+          <p className="status" data-tone={status.tone} role="status" aria-live="polite">
+            {status.message}
+          </p>
+        )}
       </header>
 
       <main className="content-grid">

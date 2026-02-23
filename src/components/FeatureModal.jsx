@@ -126,7 +126,16 @@ export default function FeatureModal({ feature, onClose }) {
           )}
 
           <section className="modal-section modal-section--wiki">
-            <p className="modal-section-heading">Wikipedia</p>
+            <p className="modal-section-heading">
+              Wikipedia
+              <span
+                className="wiki-accuracy-warning"
+                data-tip="Wikipedia result is based on a fuzzy search and may not exactly match this street name."
+                aria-label="Wikipedia accuracy disclaimer"
+              >
+                ⚠
+              </span>
+            </p>
 
             {wikiState.status === "loading" && (
               <div className="wiki-loading" aria-label="Loading Wikipedia summary">

@@ -163,6 +163,42 @@ button.ghost {
   color: var(--bad);
 }
 
+/* Loading bar */
+.loading-status {
+  margin-top: 0.75rem;
+}
+
+.loading-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+
+.loading-bar__fill {
+  position: absolute;
+  top: 0;
+  left: -45%;
+  height: 100%;
+  width: 45%;
+  background: var(--teal);
+  border-radius: 99px;
+  animation: barSlide 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes barSlide {
+  0%   { left: -45%; }
+  100% { left: 110%; }
+}
+
+.loading-label {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
 .content-grid {
   margin-top: 1rem;
   display: grid;
@@ -459,6 +495,46 @@ button.ghost {
   font-weight: 700;
   font-family: "Public Sans", "Segoe UI", sans-serif;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+}
+
+.wiki-accuracy-warning {
+  position: relative;
+  font-size: 1rem;
+  color: #d97706;
+  cursor: help;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.wiki-accuracy-warning::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.45;
+  padding: 0.4em 0.65em;
+  border-radius: 4px;
+  width: 200px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 200;
+}
+
+.wiki-accuracy-warning:hover::after {
+  opacity: 1;
 }
 
 .modal-bio {
