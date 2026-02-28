@@ -10,6 +10,8 @@ import FeatureModal from "./components/FeatureModal";
 import MapPanel from "./components/MapPanel";
 import ResultsPanel from "./components/ResultsPanel";
 import SearchControls from "./components/SearchControls";
+import StatsPanel from "./components/StatsPanel";
+import { useDatasetStats } from "./hooks/useDatasetStats";
 
 const SEARCH_LIMIT = 80;
 const INITIAL_VISIBLE_COUNT = 5;
@@ -36,6 +38,7 @@ export default function App() {
   const [status, setStatus] = useState({ message: "", tone: "neutral" });
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [ready, setReady] = useState(false);
+  const [view, setView] = useState("search");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -149,6 +152,8 @@ export default function App() {
     setVisibleCount(features.length);
   }
 
+  const stats = useDatasetStats(allFeatures);
+
   const resultCount = features.length;
   const visibleFeatures = useMemo(
     () => features.slice(0, Math.min(visibleCount, features.length)),
@@ -199,39 +204,63 @@ export default function App() {
             {status.message}
           </p>
         )}
+
+        <div className="view-toggle">
+          <button
+            type="button"
+            className={`view-toggle__btn${view === "search" ? " view-toggle__btn--active" : ""}`}
+            onClick={() => setView("search")}
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            className={`view-toggle__btn${view === "stats" ? " view-toggle__btn--active" : ""}`}
+            onClick={() => setView("stats")}
+            disabled={!ready}
+          >
+            Statistics
+          </button>
+        </div>
       </header>
 
-      <main className="content-grid">
-        <section className="panel results-panel">
-          <div className="panel-head">
-            <h2>Matching Entries</h2>
-            <span className="count-badge">{resultCount}</span>
-          </div>
-          <p className="results-summary">
-            Showing {visibleFeatures.length} of {resultCount}
-          </p>
-          <div className="results">
-            <ResultsPanel features={visibleFeatures} exceededTransferLimit={false} onLearnMore={setSelectedFeature} />
-          </div>
-          {hiddenCount > 0 && (
-            <div className="results-actions">
-              <button type="button" onClick={handleShowMore}>
-                Show {Math.min(VISIBLE_STEP, hiddenCount)} More
-              </button>
-              <button type="button" className="ghost" onClick={handleShowAll}>
-                Show All ({resultCount})
-              </button>
+      {view === "search" ? (
+        <main className="content-grid">
+          <section className="panel results-panel">
+            <div className="panel-head">
+              <h2>Matching Entries</h2>
+              <span className="count-badge">{resultCount}</span>
             </div>
-          )}
-        </section>
+            <p className="results-summary">
+              Showing {visibleFeatures.length} of {resultCount}
+            </p>
+            <div className="results">
+              <ResultsPanel features={visibleFeatures} exceededTransferLimit={false} onLearnMore={setSelectedFeature} />
+            </div>
+            {hiddenCount > 0 && (
+              <div className="results-actions">
+                <button type="button" onClick={handleShowMore}>
+                  Show {Math.min(VISIBLE_STEP, hiddenCount)} More
+                </button>
+                <button type="button" className="ghost" onClick={handleShowAll}>
+                  Show All ({resultCount})
+                </button>
+              </div>
+            )}
+          </section>
 
-        <aside className="panel map-panel">
-          <div className="panel-head">
-            <h2>Map View</h2>
-          </div>
-          <MapPanel features={visibleFeatures} />
-        </aside>
-      </main>
+          <aside className="panel map-panel">
+            <div className="panel-head">
+              <h2>Map View</h2>
+            </div>
+            <MapPanel features={visibleFeatures} />
+          </aside>
+        </main>
+      ) : (
+        <main className="stats-grid">
+          <StatsPanel stats={stats} />
+        </main>
+      )}
 
       {selectedFeature && (
         <FeatureModal feature={selectedFeature} onClose={() => setSelectedFeature(null)} />
