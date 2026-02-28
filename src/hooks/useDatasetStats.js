@@ -37,6 +37,10 @@ export function useDatasetStats(allFeatures) {
         totalFeatures: 0,
         totalCategories: 0,
         totalDivisions: 0,
+        commemoratedFeatures: 0,
+        commemoratedCoverage: 0,
+        topCategory: null,
+        topDivision: null,
         categoryDistribution: [],
         topDivisions: [],
         topCommemoratedNames: [],
@@ -46,11 +50,16 @@ export function useDatasetStats(allFeatures) {
     const categoryDistribution = countByField(allFeatures, "CATEGORY_NAME");
     const allDivisions = countByField(allFeatures, "DIVISION_CODE");
     const allCommemoratedNames = countCommemoratedNames(allFeatures);
+    const commemoratedFeatures = allCommemoratedNames.reduce((total, item) => total + item.count, 0);
 
     return {
       totalFeatures: allFeatures.length,
       totalCategories: categoryDistribution.length,
       totalDivisions: allDivisions.length,
+      commemoratedFeatures,
+      commemoratedCoverage: commemoratedFeatures / allFeatures.length,
+      topCategory: categoryDistribution[0] || null,
+      topDivision: allDivisions[0] || null,
       categoryDistribution,
       topDivisions: allDivisions.slice(0, 15),
       topCommemoratedNames: allCommemoratedNames.slice(0, 15),
