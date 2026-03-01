@@ -168,33 +168,7 @@ export default function StatsPanel({ stats }) {
 
   return (
     <>
-      <section className="stats-card panel stats-overview">
-        <div className="stats-overview__copy">
-          <p className="stats-eyebrow">Dataset Snapshot</p>
-          <h2>Street naming patterns at a glance</h2>
-          <p className="stats-overview__text">
-            {topCategory
-              ? `${topCategory.name} is the biggest category, while ${topDivision?.name || "the busiest division"} carries one of the densest clusters of named features.`
-              : "Load the place-name dataset to explore how categories, divisions, and commemorations are distributed."}
-          </p>
-          <div className="stats-overview__pills">
-            <span className="stats-pill">
-              {topCategory ? `${formatPercent(topCategory.count / totalFeatures)} in ${topCategory.name}` : "No category data yet"}
-            </span>
-            <span className="stats-pill">
-              {commemoratedFeatures
-                ? `${formatPercent(commemoratedCoverage)} include commemorated names`
-                : "No commemorated names parsed yet"}
-            </span>
-          </div>
-        </div>
-        <div className="stats-overview__glow" aria-hidden="true">
-          <div className="stats-overview__ring" />
-          <div className="stats-overview__ring stats-overview__ring--inner" />
-        </div>
-      </section>
-
-      <section className="stats-card panel stat-number-row">
+<section className="stats-card panel stat-number-row">
         <StatCard
           eyebrow="Scale"
           value={totalFeatures.toLocaleString()}
