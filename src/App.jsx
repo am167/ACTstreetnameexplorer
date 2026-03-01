@@ -32,7 +32,10 @@ export default function App() {
   }, [darkMode]);
 
   const [queryInput, setQueryInput] = useState("");
-  const [category, setCategory] = useState("");
+  const [scope, setScope] = useState("all");
+  const [division, setDivision] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [sortBy, setSortBy] = useState("relevance");
   const [allFeatures, setAllFeatures] = useState(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [status, setStatus] = useState({ message: "", tone: "neutral" });
@@ -86,6 +89,20 @@ export default function App() {
     return result.sort();
   }, [allFeatures]);
 
+  const divisions = useMemo(() => {
+    if (!allFeatures) return [];
+    const seen = new Set();
+    const result = [];
+    for (const f of allFeatures) {
+      const d = f.attributes?.DIVISION_CODE;
+      if (d && !seen.has(d)) {
+        seen.add(d);
+        result.push(d);
+      }
+    }
+    return result.sort();
+  }, [allFeatures]);
+
   const features = useMemo(() => {
     if (!allFeatures) return [];
 
@@ -94,13 +111,25 @@ export default function App() {
 
     let results = allFeatures;
 
-    if (category) {
-      results = results.filter((f) => f.attributes?.CATEGORY_NAME === category);
+    if (selectedCategories.length > 0) {
+      results = results.filter((f) => selectedCategories.includes(f.attributes?.CATEGORY_NAME));
+    }
+
+    if (division) {
+      results = results.filter((f) => f.attributes?.DIVISION_CODE === division);
     }
 
     if (normalizedQuery) {
       results = results.filter((f) => {
         const a = f.attributes || {};
+        if (scope === "name") {
+          return (
+            normalizeText(a.NAME).includes(normalizedQuery) ||
+            normalizeText(a.OTHER_NAME || "").includes(normalizedQuery)
+          );
+        } else if (scope === "biography") {
+          return normalizeText(a.DESCRIPTION || "").includes(normalizedQuery);
+        }
         return (
           normalizeText(a.NAME).includes(normalizedQuery) ||
           normalizeText(a.OTHER_NAME || "").includes(normalizedQuery) ||
@@ -109,31 +138,51 @@ export default function App() {
       });
       results = results
         .map((f, i) => ({ f, i, score: scoreFeatureRelevance(f, normalizedQuery) }))
-        .sort(
-          (a, b) =>
-            b.score - a.score || compareByNameThenId(a.f, b.f) || a.i - b.i
-        )
+        .sort((a, b) => {
+          if (sortBy === "name") {
+            return String(a.f.attributes?.NAME || "").localeCompare(String(b.f.attributes?.NAME || ""));
+          }
+          if (sortBy === "category") {
+            const catCmp = String(a.f.attributes?.CATEGORY_NAME || "").localeCompare(
+              String(b.f.attributes?.CATEGORY_NAME || "")
+            );
+            if (catCmp !== 0) return catCmp;
+            return String(a.f.attributes?.NAME || "").localeCompare(String(b.f.attributes?.NAME || ""));
+          }
+          return b.score - a.score || compareByNameThenId(a.f, b.f) || a.i - b.i;
+        })
         .map(({ f }) => f);
     } else {
-      results = [...results].sort(compareByNameThenId);
+      if (sortBy === "category") {
+        results = [...results].sort((a, b) => {
+          const catCmp = String(a.attributes?.CATEGORY_NAME || "").localeCompare(
+            String(b.attributes?.CATEGORY_NAME || "")
+          );
+          if (catCmp !== 0) return catCmp;
+          return compareByNameThenId(a, b);
+        });
+      } else {
+        results = [...results].sort(compareByNameThenId);
+      }
     }
 
     return results.slice(0, SEARCH_LIMIT);
-  }, [allFeatures, queryInput, category]);
+  }, [allFeatures, queryInput, selectedCategories, division, scope, sortBy]);
 
   useEffect(() => {
     if (!ready) return;
     const querySummary = queryInput.trim() ? ` for "${queryInput.trim()}"` : "";
-    const categorySummary = category ? ` in ${category}` : "";
+    const categorySummary = selectedCategories.length > 0 ? ` in ${selectedCategories.join(", ")}` : "";
+    const divisionSummary = division ? ` (${division})` : "";
     setStatus({
-      message: `Showing ${features.length} result${features.length === 1 ? "" : "s"}${querySummary}${categorySummary}.`,
+      message: `Showing ${features.length} result${features.length === 1 ? "" : "s"}${querySummary}${categorySummary}${divisionSummary}.`,
       tone: "success",
     });
-  }, [features, queryInput, category, ready]);
+  }, [features, queryInput, selectedCategories, division, ready]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
-  }, [queryInput, category]);
+  }, [queryInput, selectedCategories, division, scope, sortBy]);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -141,7 +190,10 @@ export default function App() {
 
   function handleClear() {
     setQueryInput("");
-    setCategory("");
+    setScope("all");
+    setDivision("");
+    setSelectedCategories([]);
+    setSortBy("relevance");
   }
 
   function handleShowMore() {
@@ -187,9 +239,16 @@ export default function App() {
           onQueryInputChange={setQueryInput}
           onSubmit={handleSubmit}
           onClear={handleClear}
-          category={category}
-          onCategoryChange={setCategory}
+          scope={scope}
+          onScopeChange={setScope}
+          division={division}
+          onDivisionChange={setDivision}
+          divisions={divisions}
+          selectedCategories={selectedCategories}
+          onSelectedCategoriesChange={setSelectedCategories}
           categories={categories}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
         />
 
         {status.tone === "loading" ? (
